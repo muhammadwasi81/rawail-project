@@ -1,71 +1,85 @@
-// Test function to ensure script is loading
-console.log("🚀 Library Management System script loaded!");
-
-// Global variables
-let charts = {};
 let currentTable = "";
 
-// Initialize Navigation Event Listeners
-function initializeNavigation() {
-  console.log("Setting up navigation event listeners...");
+// Initialize All Event Listeners
+function initializeEventListeners() {
+  console.log("Setting up all event listeners...");
 
-  // Add click event listeners to navigation buttons as backup
+  // Navigation buttons
   const navButtons = document.querySelectorAll(".nav-btn");
   navButtons.forEach((button) => {
     button.addEventListener("click", function (e) {
       e.preventDefault();
-      const buttonText = this.textContent.trim();
-      console.log("Navigation button clicked:", buttonText);
+      const section = this.dataset.section;
+      console.log("Navigation button clicked for section:", section);
 
-      if (buttonText.includes("Dashboard")) {
-        showSection("dashboard");
-      } else if (buttonText.includes("Books")) {
-        showSection("books");
-      } else if (buttonText.includes("Members")) {
-        showSection("members");
-      } else if (buttonText.includes("Loans")) {
-        showSection("loans");
-      } else if (buttonText.includes("Reports")) {
-        showSection("reports");
-      } else if (buttonText.includes("Manage Data")) {
-        showSection("manage");
+      if (section) {
+        showSection(section);
       }
     });
   });
 
-  console.log("Navigation event listeners set up successfully!");
-}
+  // Add form buttons
+  const addButtons = document.querySelectorAll('[data-action="add"]');
+  addButtons.forEach((button) => {
+    button.addEventListener("click", function (e) {
+      e.preventDefault();
+      const type = this.dataset.type;
+      console.log("Add button clicked for type:", type);
 
-// Function to wait for Chart.js to load
-function waitForChart() {
-  return new Promise((resolve) => {
-    if (typeof Chart !== "undefined") {
-      console.log("✅ Chart.js is ready");
-      resolve();
-    } else {
-      console.log("⏳ Waiting for Chart.js to load...");
-      setTimeout(() => waitForChart().then(resolve), 100);
-    }
+      if (type) {
+        showAddForm(type);
+      }
+    });
   });
+
+  // Report buttons
+  const reportButtons = document.querySelectorAll('[data-action="report"]');
+  reportButtons.forEach((button) => {
+    button.addEventListener("click", function (e) {
+      e.preventDefault();
+      const type = this.dataset.type;
+      console.log("Report button clicked for type:", type);
+
+      if (type === "overdue") {
+        generateOverdueReport();
+      } else if (type === "popular") {
+        generatePopularBooksReport();
+      }
+    });
+  });
+
+  // Manage table cards
+  const manageCards = document.querySelectorAll('[data-action="manage"]');
+  manageCards.forEach((card) => {
+    card.addEventListener("click", function (e) {
+      e.preventDefault();
+      const table = this.dataset.table;
+      console.log("Manage card clicked for table:", table);
+
+      if (table) {
+        showManageTable(table);
+      }
+    });
+  });
+
+  // Close modal buttons
+  const closeButtons = document.querySelectorAll('[data-action="close"]');
+  closeButtons.forEach((button) => {
+    button.addEventListener("click", function (e) {
+      e.preventDefault();
+      console.log("Close button clicked");
+      closeModal();
+    });
+  });
+
+  console.log("All event listeners set up successfully!");
 }
 
 // DOM Content Loaded Event
 document.addEventListener("DOMContentLoaded", async function () {
   console.log("DOM loaded, initializing application...");
 
-  // Wait for Chart.js to load before proceeding
-  await waitForChart();
-
-  // Initialize navigation event listeners
-  initializeNavigation();
-
-  // Load initial data
-  loadDashboard();
-  loadBooks();
-  loadMembers();
-  loadLoans();
-
-  // Make sure navigation functions are available globally for onclick handlers
+  // Make sure navigation functions are available globally for onclick handlers first
   window.showSection = showSection;
   window.showAddForm = showAddForm;
   window.showManageTable = showManageTable;
@@ -73,6 +87,23 @@ document.addEventListener("DOMContentLoaded", async function () {
   window.generateOverdueReport = generateOverdueReport;
   window.generatePopularBooksReport = generatePopularBooksReport;
   window.closeModal = closeModal;
+
+  // Force dashboard to be visible
+  const dashboard = document.getElementById("dashboard");
+  if (dashboard) {
+    dashboard.style.display = "block";
+    dashboard.classList.add("active");
+    console.log("✅ Dashboard forced to be visible");
+  }
+
+  // Initialize all event listeners
+  initializeEventListeners();
+
+  // Load initial data
+  loadDashboard();
+  loadBooks();
+  loadMembers();
+  loadLoans();
 
   console.log("Application initialized successfully!");
 });
@@ -107,7 +138,7 @@ function showSection(sectionName) {
 
     // Add active class to clicked nav button
     const clickedButton = document.querySelector(
-      `[onclick="showSection('${sectionName}')"]`
+      `[data-section="${sectionName}"]`
     );
     if (clickedButton) {
       clickedButton.classList.add("active");
@@ -173,8 +204,17 @@ async function apiPost(endpoint, data) {
       },
       body: JSON.stringify(data),
     });
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    return await response.json();
+
+    const responseData = await response.json();
+
+    if (!response.ok) {
+      // Throw an error with the server's error message
+      const errorMessage =
+        responseData.error || `HTTP error! status: ${response.status}`;
+      throw new Error(JSON.stringify(responseData));
+    }
+
+    return responseData;
   } catch (error) {
     console.error(`Error posting to ${endpoint}:`, error);
     throw error;
@@ -194,210 +234,29 @@ async function loadDashboard() {
     }
 
     // Update stat cards
-    document.getElementById("totalBooks").textContent = stats.totalBooks || 0;
-    document.getElementById("totalMembers").textContent =
-      stats.totalMembers || 0;
-    document.getElementById("activeLoans").textContent = stats.activeLoans || 0;
-    document.getElementById("pendingFines").textContent = `$${(
-      stats.pendingFines || 0
-    ).toFixed(2)}`;
+    const totalBooksEl = document.getElementById("totalBooks");
+    const totalMembersEl = document.getElementById("totalMembers");
+    const activeLoansEl = document.getElementById("activeLoans");
 
-    console.log("📊 Creating charts...");
-    // Create charts
-    createGenreChart(stats.booksByGenre || []);
-    createStatusChart(stats.booksByStatus || []);
-    createLoanChart(stats.monthlyLoans || []);
+    console.log("📊 Updating stat cards:", {
+      totalBooksEl: !!totalBooksEl,
+      totalMembersEl: !!totalMembersEl,
+      activeLoansEl: !!activeLoansEl,
+      stats,
+    });
+
+    if (totalBooksEl) totalBooksEl.textContent = stats.totalBooks || 0;
+    if (totalMembersEl) totalMembersEl.textContent = stats.totalMembers || 0;
+    if (activeLoansEl) activeLoansEl.textContent = stats.activeLoans || 0;
+
+    const pendingFinesEl = document.getElementById("pendingFines");
+    if (pendingFinesEl) {
+      pendingFinesEl.textContent = `$${(stats.pendingFines || 0).toFixed(2)}`;
+    }
 
     console.log("✅ Dashboard loaded successfully");
   } catch (error) {
     console.error("❌ Error loading dashboard:", error);
-  }
-}
-
-function createGenreChart(data) {
-  try {
-    console.log("📊 Creating genre chart with data:", data);
-
-    if (typeof Chart === "undefined") {
-      console.error("❌ Chart.js is not loaded");
-      return;
-    }
-
-    const canvas = document.getElementById("genreChart");
-    if (!canvas) {
-      console.error("❌ Genre chart canvas not found");
-      return;
-    }
-
-    const ctx = canvas.getContext("2d");
-
-    if (charts.genreChart) {
-      charts.genreChart.destroy();
-    }
-
-    charts.genreChart = new Chart(ctx, {
-      type: "doughnut",
-      data: {
-        labels: data.map((item) => item.name),
-        datasets: [
-          {
-            data: data.map((item) => item.count),
-            backgroundColor: [
-              "#3498db",
-              "#e74c3c",
-              "#2ecc71",
-              "#f39c12",
-              "#9b59b6",
-              "#1abc9c",
-              "#34495e",
-              "#e67e22",
-              "#95a5a6",
-              "#16a085",
-            ],
-            borderWidth: 2,
-            borderColor: "#fff",
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: "bottom",
-            labels: {
-              padding: 20,
-              usePointStyle: true,
-            },
-          },
-        },
-      },
-    });
-
-    console.log("✅ Genre chart created successfully");
-  } catch (error) {
-    console.error("❌ Error creating genre chart:", error);
-  }
-}
-
-function createStatusChart(data) {
-  try {
-    console.log("📊 Creating status chart with data:", data);
-
-    if (typeof Chart === "undefined") {
-      console.error("❌ Chart.js is not loaded");
-      return;
-    }
-
-    const canvas = document.getElementById("statusChart");
-    if (!canvas) {
-      console.error("❌ Status chart canvas not found");
-      return;
-    }
-
-    const ctx = canvas.getContext("2d");
-
-    if (charts.statusChart) {
-      charts.statusChart.destroy();
-    }
-
-    charts.statusChart = new Chart(ctx, {
-      type: "pie",
-      data: {
-        labels: data.map((item) => item.status),
-        datasets: [
-          {
-            data: data.map((item) => item.count),
-            backgroundColor: ["#2ecc71", "#e74c3c"],
-            borderWidth: 2,
-            borderColor: "#fff",
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: "bottom",
-            labels: {
-              padding: 20,
-              usePointStyle: true,
-            },
-          },
-        },
-      },
-    });
-
-    console.log("✅ Status chart created successfully");
-  } catch (error) {
-    console.error("❌ Error creating status chart:", error);
-  }
-}
-
-function createLoanChart(data) {
-  try {
-    console.log("📊 Creating loan chart with data:", data);
-
-    if (typeof Chart === "undefined") {
-      console.error("❌ Chart.js is not loaded");
-      return;
-    }
-
-    const canvas = document.getElementById("loanChart");
-    if (!canvas) {
-      console.error("❌ Loan chart canvas not found");
-      return;
-    }
-
-    const ctx = canvas.getContext("2d");
-
-    if (charts.loanChart) {
-      charts.loanChart.destroy();
-    }
-
-    charts.loanChart = new Chart(ctx, {
-      type: "bar",
-      data: {
-        labels: data.map((item) =>
-          new Date(item.month).toLocaleDateString("en-US", {
-            month: "short",
-            year: "numeric",
-          })
-        ),
-        datasets: [
-          {
-            label: "Number of Loans",
-            data: data.map((item) => item.loan_count),
-            backgroundColor: "rgba(52, 152, 219, 0.8)",
-            borderColor: "#3498db",
-            borderWidth: 2,
-            borderRadius: 5,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          y: {
-            beginAtZero: true,
-            ticks: {
-              stepSize: 1,
-            },
-          },
-        },
-        plugins: {
-          legend: {
-            display: false,
-          },
-        },
-      },
-    });
-
-    console.log("✅ Loan chart created successfully");
-  } catch (error) {
-    console.error("❌ Error creating loan chart:", error);
   }
 }
 
@@ -607,15 +466,25 @@ document
       data[key] = value;
     }
 
+    console.log("Submitting form data:", data);
+
     try {
-      await apiPost(
-        currentTable === "book"
-          ? "books"
-          : currentTable === "member"
-          ? "members"
-          : "loans",
-        data
-      );
+      // Determine the correct endpoint
+      let endpoint;
+      if (currentTable === "book") {
+        endpoint = "books";
+      } else if (currentTable === "member") {
+        endpoint = "members";
+      } else if (currentTable === "loan") {
+        endpoint = "loans";
+      } else {
+        // For manage data forms (genres, authors, etc.)
+        endpoint = currentTable;
+      }
+
+      const result = await apiPost(endpoint, data);
+
+      console.log("API response:", result);
 
       closeModal();
 
@@ -630,14 +499,35 @@ document
         case "loan":
           loadLoans();
           break;
+        default:
+          // For manage data sections, reload that table
+          showManageTable(currentTable);
+          break;
       }
 
       loadDashboard(); // Refresh dashboard stats
 
       // Show success message
-      showNotification("Data added successfully!", "success");
+      const message = result?.message || "Data added successfully!";
+      showNotification(message, "success");
     } catch (error) {
-      showNotification("Error adding data. Please try again.", "error");
+      console.error("Form submission error:", error);
+
+      // Extract error message from the response
+      let errorMessage = "Error adding data. Please try again.";
+
+      if (error.message) {
+        try {
+          // Try to parse JSON error response
+          const errorResponse = JSON.parse(error.message);
+          errorMessage = errorResponse.error || errorMessage;
+        } catch (parseError) {
+          // If not JSON, use the raw message
+          errorMessage = error.message;
+        }
+      }
+
+      showNotification(errorMessage, "error");
     }
   });
 
@@ -654,7 +544,7 @@ async function showManageTable(tableName) {
                 <h3>Manage ${
                   tableName.charAt(0).toUpperCase() + tableName.slice(1)
                 }</h3>
-                <button class="btn btn-primary" onclick="showManageAddForm('${tableName}')">
+                <button class="btn btn-primary" data-action="manage-add" data-table="${tableName}">
                     <i class="fas fa-plus"></i> Add New
                 </button>
             </div>
@@ -693,6 +583,20 @@ async function showManageTable(tableName) {
         `;
 
     container.innerHTML = tableHTML;
+
+    // Add event listener to the dynamically created button
+    const addButton = container.querySelector('[data-action="manage-add"]');
+    if (addButton) {
+      addButton.addEventListener("click", function (e) {
+        e.preventDefault();
+        const table = this.dataset.table;
+        console.log("Manage add button clicked for table:", table);
+
+        if (table) {
+          showManageAddForm(table);
+        }
+      });
+    }
   } catch (error) {
     console.error(`Error loading ${tableName}:`, error);
   }

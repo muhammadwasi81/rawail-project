@@ -45,11 +45,12 @@ body {
 
 /* Navigation Styles */
 .navigation {
-  display: flex;
+  display: flex !important;
   flex-wrap: wrap;
   gap: 15px;
   margin-bottom: 30px;
   justify-content: center;
+  visibility: visible !important;
 }
 
 .nav-btn {
@@ -97,6 +98,11 @@ body {
 }
 
 .section.active {
+  display: block !important;
+}
+
+/* Dashboard should be visible by default */
+#dashboard {
   display: block;
 }
 
@@ -160,32 +166,6 @@ body {
 .stat-info p {
   color: #7f8c8d;
   font-weight: 500;
-}
-
-/* Charts Grid */
-.charts-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 30px;
-  margin-top: 30px;
-}
-
-.chart-container {
-  background: white;
-  border-radius: 15px;
-  padding: 25px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-}
-
-.chart-container.full-width {
-  grid-column: 1 / -1;
-}
-
-.chart-container h3 {
-  color: #2c3e50;
-  margin-bottom: 20px;
-  font-size: 1.3rem;
-  font-weight: 600;
 }
 
 /* Table Styles */
@@ -475,10 +455,6 @@ tbody tr:nth-child(even) {
   }
 
   .dashboard-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .charts-grid {
     grid-template-columns: 1fr;
   }
 

@@ -168,16 +168,104 @@ app.get("/api/books", async (req, res) => {
 // POST new book
 app.post("/api/books", async (req, res) => {
   try {
+    console.log("📚 Received book creation request:", req.body);
     const { title, authorid, isbn, genreid, publicationyear, status } =
       req.body;
+
+    // Validation
+    if (!title || title.trim().length === 0) {
+      console.log("❌ Validation failed: Title is required");
+      return res.status(400).json({ error: "Title is required" });
+    }
+
+    if (!authorid || isNaN(parseInt(authorid))) {
+      console.log("❌ Validation failed: Invalid Author ID");
+      return res.status(400).json({ error: "Valid Author ID is required" });
+    }
+
+    if (!genreid || isNaN(parseInt(genreid))) {
+      console.log("❌ Validation failed: Invalid Genre ID");
+      return res.status(400).json({ error: "Valid Genre ID is required" });
+    }
+
+    // Validate and truncate ISBN to 13 characters if needed
+    let validatedISBN = isbn ? isbn.toString().trim() : "";
+    if (validatedISBN.length > 13) {
+      validatedISBN = validatedISBN.substring(0, 13);
+      console.log(`ISBN truncated from "${isbn}" to "${validatedISBN}"`);
+    }
+
+    // Validate publication year
+    const currentYear = new Date().getFullYear();
+    const year = parseInt(publicationyear);
+    if (
+      publicationyear &&
+      (isNaN(year) || year < 1000 || year > currentYear + 1)
+    ) {
+      return res.status(400).json({
+        error: `Publication year must be between 1000 and ${currentYear + 1}`,
+      });
+    }
+
+    console.log("✅ Validation passed, attempting database insert");
+    console.log("📊 Insert parameters:", [
+      title.trim(),
+      parseInt(authorid),
+      validatedISBN,
+      parseInt(genreid),
+      year || null,
+      status || "Available",
+    ]);
+
     const result = await pool.query(
       "INSERT INTO Books (Title, AuthorID, ISBN, GenreID, PublicationYear, Status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
-      [title, authorid, isbn, genreid, publicationyear, status || "Available"]
+      [
+        title.trim(),
+        parseInt(authorid),
+        validatedISBN,
+        parseInt(genreid),
+        year || null,
+        status || "Available",
+      ]
     );
-    res.status(201).json(result.rows[0]);
+
+    console.log("✅ Book added successfully:", result.rows[0]);
+    res.status(201).json({
+      success: true,
+      message: "Book added successfully",
+      data: result.rows[0],
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
+    console.error("Error adding book:", err);
+
+    // Handle specific database errors
+    if (err.code === "23503") {
+      // Foreign key violation
+      if (err.constraint && err.constraint.includes("authorid")) {
+        return res.status(400).json({ error: "Author ID does not exist" });
+      }
+      if (err.constraint && err.constraint.includes("genreid")) {
+        return res.status(400).json({ error: "Genre ID does not exist" });
+      }
+      return res.status(400).json({ error: "Invalid reference ID provided" });
+    }
+
+    if (err.code === "23505") {
+      // Unique constraint violation
+      return res.status(400).json({ error: "ISBN already exists" });
+    }
+
+    if (err.code === "22001") {
+      // Value too long
+      return res.status(400).json({
+        error: "One or more values are too long for database constraints",
+      });
+    }
+
+    res.status(500).json({
+      error: "Failed to add book",
+      details: process.env.NODE_ENV === "development" ? err.message : undefined,
+    });
   }
 });
 
@@ -196,15 +284,144 @@ app.get("/api/members", async (req, res) => {
 // POST new member
 app.post("/api/members", async (req, res) => {
   try {
+    console.log("👤 Received member creation request:", req.body);
     const { name, email, phone, joindate } = req.body;
+
+    // Validation
+    if (!name || name.trim().length === 0) {
+      console.log("❌ Validation failed: Name is required");
+      return res.status(400).json({ error: "Name is required" });
+    }
+
+    if (!email || email.trim().length === 0) {
+      console.log("❌ Validation failed: Email is required");
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      console.log("❌ Validation failed: Invalid email format");
+      return res.status(400).json({ error: "Invalid email format" });
+    }
+
+    // Validate and clean phone if provided
+    let validatedPhone = null;
+    if (phone && phone.trim().length > 0) {
+      // Remove all non-numeric characters for length validation
+      const cleanPhone = phone.replace(/[^\d]/g, "");
+      if (cleanPhone.length < 10 || cleanPhone.length > 15) {
+        console.log("❌ Validation failed: Invalid phone number length");
+        return res.status(400).json({
+          error: "Phone number must contain 10-15 digits",
+        });
+      }
+
+      // Keep the original format but ensure it fits in VARCHAR(15)
+      validatedPhone = phone.trim();
+      if (validatedPhone.length > 15) {
+        console.log("❌ Validation failed: Phone number too long for database");
+        return res.status(400).json({
+          error:
+            "Phone number is too long (max 15 characters including formatting)",
+        });
+      }
+    }
+
+    // Validate name length (typically VARCHAR(100) or similar)
+    if (name.trim().length > 100) {
+      console.log("❌ Validation failed: Name too long");
+      return res.status(400).json({
+        error: "Name is too long (max 100 characters)",
+      });
+    }
+
+    // Validate email length (typically VARCHAR(255))
+    if (email.trim().length > 255) {
+      console.log("❌ Validation failed: Email too long");
+      return res.status(400).json({
+        error: "Email is too long (max 255 characters)",
+      });
+    }
+
+    // Validate join date if provided
+    let validatedJoinDate = joindate;
+    if (joindate) {
+      const dateObj = new Date(joindate);
+      if (isNaN(dateObj.getTime())) {
+        console.log("❌ Validation failed: Invalid join date");
+        return res.status(400).json({ error: "Invalid join date format" });
+      }
+
+      // Check if date is not in the future
+      if (dateObj > new Date()) {
+        console.log("❌ Validation failed: Join date cannot be in the future");
+        return res.status(400).json({
+          error: "Join date cannot be in the future",
+        });
+      }
+    } else {
+      validatedJoinDate = new Date().toISOString().split("T")[0];
+    }
+
+    console.log("✅ Validation passed, attempting database insert");
+    console.log("📊 Insert parameters:", [
+      name.trim(),
+      email.trim().toLowerCase(),
+      validatedPhone,
+      validatedJoinDate,
+    ]);
+
     const result = await pool.query(
       "INSERT INTO Members (Name, Email, Phone, JoinDate) VALUES ($1, $2, $3, $4) RETURNING *",
-      [name, email, phone, joindate || new Date().toISOString().split("T")[0]]
+      [
+        name.trim(),
+        email.trim().toLowerCase(),
+        validatedPhone,
+        validatedJoinDate,
+      ]
     );
-    res.status(201).json(result.rows[0]);
+
+    console.log("✅ Member added successfully:", result.rows[0]);
+    res.status(201).json({
+      success: true,
+      message: "Member added successfully",
+      data: result.rows[0],
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
+    console.error("Error adding member:", err);
+
+    // Handle specific database errors
+    if (err.code === "23505") {
+      // Unique constraint violation (duplicate email)
+      if (err.constraint && err.constraint.includes("email")) {
+        return res.status(400).json({
+          error: "Email address already exists. Please use a different email.",
+        });
+      }
+      return res.status(400).json({ error: "Duplicate entry found" });
+    }
+
+    if (err.code === "22001") {
+      // Value too long - provide specific guidance
+      console.log("❌ Database constraint error - value too long:", err.detail);
+      return res.status(400).json({
+        error:
+          "Phone number is too long for database (max 15 characters). Please use a shorter format like: 1234567890",
+      });
+    }
+
+    if (err.code === "23514") {
+      // Check constraint violation
+      return res.status(400).json({
+        error: "Data validation failed. Please check your input values.",
+      });
+    }
+
+    res.status(500).json({
+      error: "Failed to add member",
+      details: process.env.NODE_ENV === "development" ? err.message : undefined,
+    });
   }
 });
 
@@ -232,15 +449,110 @@ app.get("/api/loans", async (req, res) => {
 // POST new loan
 app.post("/api/loans", async (req, res) => {
   try {
+    console.log("📖 Received loan creation request:", req.body);
     const { bookid, memberid, issuedate, returndate, status } = req.body;
+
+    // Validation
+    if (!bookid || isNaN(parseInt(bookid))) {
+      console.log("❌ Validation failed: Valid Book ID is required");
+      return res.status(400).json({ error: "Valid Book ID is required" });
+    }
+
+    if (!memberid || isNaN(parseInt(memberid))) {
+      console.log("❌ Validation failed: Valid Member ID is required");
+      return res.status(400).json({ error: "Valid Member ID is required" });
+    }
+
+    // Validate issue date
+    let validatedIssueDate = issuedate;
+    if (issuedate) {
+      const dateObj = new Date(issuedate);
+      if (isNaN(dateObj.getTime())) {
+        console.log("❌ Validation failed: Invalid issue date");
+        return res.status(400).json({ error: "Invalid issue date format" });
+      }
+    } else {
+      validatedIssueDate = new Date().toISOString().split("T")[0];
+    }
+
+    // Validate return date if provided
+    let validatedReturnDate = returndate;
+    if (returndate) {
+      const returnDateObj = new Date(returndate);
+      const issueDateObj = new Date(validatedIssueDate);
+
+      if (isNaN(returnDateObj.getTime())) {
+        console.log("❌ Validation failed: Invalid return date");
+        return res.status(400).json({ error: "Invalid return date format" });
+      }
+
+      if (returnDateObj <= issueDateObj) {
+        console.log(
+          "❌ Validation failed: Return date must be after issue date"
+        );
+        return res.status(400).json({
+          error: "Return date must be after issue date",
+        });
+      }
+    }
+
+    console.log("✅ Validation passed, attempting database insert");
+    console.log("📊 Insert parameters:", [
+      parseInt(bookid),
+      parseInt(memberid),
+      validatedIssueDate,
+      validatedReturnDate,
+      status || "Active",
+    ]);
+
     const result = await pool.query(
       "INSERT INTO Loans (BookID, MemberID, IssueDate, ReturnDate, Status) VALUES ($1, $2, $3, $4, $5) RETURNING *",
-      [bookid, memberid, issuedate, returndate, status || "Active"]
+      [
+        parseInt(bookid),
+        parseInt(memberid),
+        validatedIssueDate,
+        validatedReturnDate,
+        status || "Active",
+      ]
     );
-    res.status(201).json(result.rows[0]);
+
+    console.log("✅ Loan added successfully:", result.rows[0]);
+    res.status(201).json({
+      success: true,
+      message: "Loan added successfully",
+      data: result.rows[0],
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
+    console.error("Error adding loan:", err);
+
+    // Handle specific database errors
+    if (err.code === "23503") {
+      // Foreign key violation
+      if (err.constraint && err.constraint.includes("bookid")) {
+        return res.status(400).json({ error: "Book ID does not exist" });
+      }
+      if (err.constraint && err.constraint.includes("memberid")) {
+        return res.status(400).json({ error: "Member ID does not exist" });
+      }
+      return res.status(400).json({ error: "Invalid reference ID provided" });
+    }
+
+    if (err.code === "23505") {
+      // Unique constraint violation
+      return res.status(400).json({ error: "Duplicate loan entry" });
+    }
+
+    if (err.code === "22001") {
+      // Value too long
+      return res.status(400).json({
+        error: "One or more values are too long for database constraints",
+      });
+    }
+
+    res.status(500).json({
+      error: "Failed to add loan",
+      details: process.env.NODE_ENV === "development" ? err.message : undefined,
+    });
   }
 });
 
