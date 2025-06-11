@@ -254,9 +254,227 @@ async function loadDashboard() {
       pendingFinesEl.textContent = `$${(stats.pendingFines || 0).toFixed(2)}`;
     }
 
+    // Render charts
+    renderCharts(stats);
+
     console.log("✅ Dashboard loaded successfully");
   } catch (error) {
     console.error("❌ Error loading dashboard:", error);
+  }
+}
+
+// Chart rendering functions
+function renderCharts(stats) {
+  renderGenreChart(stats.booksByGenre);
+  renderStatusChart(stats.booksByStatus);
+  renderMonthlyLoansChart(stats.monthlyLoans);
+}
+
+function renderGenreChart(genreData) {
+  // Prepare data for ApexCharts
+  const labels = genreData.map((item) => item.name);
+  const series = genreData.map((item) => parseInt(item.count));
+
+  const options = {
+    chart: {
+      type: "pie",
+      height: 350,
+      animations: {
+        enabled: true,
+        easing: "easeinout",
+        speed: 800,
+      },
+    },
+    series: series,
+    labels: labels,
+    colors: [
+      "#3498db",
+      "#e74c3c",
+      "#2ecc71",
+      "#f39c12",
+      "#9b59b6",
+      "#1abc9c",
+      "#34495e",
+      "#95a5a6",
+    ],
+    legend: {
+      position: "bottom",
+      fontSize: "14px",
+    },
+    plotOptions: {
+      pie: {
+        donut: {
+          size: "45%",
+        },
+      },
+    },
+    dataLabels: {
+      enabled: true,
+      style: {
+        fontSize: "12px",
+      },
+    },
+    tooltip: {
+      y: {
+        formatter: function (val) {
+          return val + " books";
+        },
+      },
+    },
+  };
+
+  // Clear existing chart
+  const chartElement = document.querySelector("#genreChart");
+  if (chartElement) {
+    chartElement.innerHTML = "";
+    const chart = new ApexCharts(chartElement, options);
+    chart.render();
+  }
+}
+
+function renderStatusChart(statusData) {
+  const labels = statusData.map((item) => item.status);
+  const series = statusData.map((item) => parseInt(item.count));
+
+  const options = {
+    chart: {
+      type: "donut",
+      height: 350,
+      animations: {
+        enabled: true,
+        easing: "easeinout",
+        speed: 800,
+      },
+    },
+    series: series,
+    labels: labels,
+    colors: ["#2ecc71", "#e74c3c", "#f39c12", "#3498db"],
+    legend: {
+      position: "bottom",
+      fontSize: "14px",
+    },
+    plotOptions: {
+      pie: {
+        donut: {
+          size: "60%",
+          labels: {
+            show: true,
+            total: {
+              show: true,
+              label: "Total Books",
+              fontSize: "16px",
+              fontWeight: 600,
+              color: "#2c3e50",
+            },
+          },
+        },
+      },
+    },
+    dataLabels: {
+      enabled: true,
+      style: {
+        fontSize: "12px",
+      },
+    },
+    tooltip: {
+      y: {
+        formatter: function (val) {
+          return val + " books";
+        },
+      },
+    },
+  };
+
+  const chartElement = document.querySelector("#statusChart");
+  if (chartElement) {
+    chartElement.innerHTML = "";
+    const chart = new ApexCharts(chartElement, options);
+    chart.render();
+  }
+}
+
+function renderMonthlyLoansChart(monthlyData) {
+  // Process the data - convert months and sort
+  const processedData = monthlyData
+    .map((item) => ({
+      month: new Date(item.month).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+      }),
+      count: parseInt(item.loan_count),
+    }))
+    .reverse(); // Reverse to show oldest to newest
+
+  const labels = processedData.map((item) => item.month);
+  const series = processedData.map((item) => item.count);
+
+  const options = {
+    chart: {
+      type: "bar",
+      height: 350,
+      animations: {
+        enabled: true,
+        easing: "easeinout",
+        speed: 800,
+      },
+      toolbar: {
+        show: true,
+      },
+    },
+    series: [
+      {
+        name: "Loans",
+        data: series,
+      },
+    ],
+    xaxis: {
+      categories: labels,
+      labels: {
+        style: {
+          fontSize: "12px",
+        },
+      },
+    },
+    yaxis: {
+      title: {
+        text: "Number of Loans",
+        style: {
+          fontSize: "14px",
+          fontWeight: 600,
+        },
+      },
+    },
+    colors: ["#3498db"],
+    plotOptions: {
+      bar: {
+        borderRadius: 4,
+        columnWidth: "60%",
+      },
+    },
+    dataLabels: {
+      enabled: false,
+    },
+    tooltip: {
+      y: {
+        formatter: function (val) {
+          return val + " loans";
+        },
+      },
+    },
+    grid: {
+      borderColor: "#e7e7e7",
+      row: {
+        colors: ["#f3f3f3", "transparent"],
+        opacity: 0.5,
+      },
+    },
+  };
+
+  const chartElement = document.querySelector("#monthlyLoansChart");
+  if (chartElement) {
+    chartElement.innerHTML = "";
+    const chart = new ApexCharts(chartElement, options);
+    chart.render();
   }
 }
 

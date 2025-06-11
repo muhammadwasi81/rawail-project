@@ -9,6 +9,7 @@
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
     />
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
   </head>
   <body>
     <div class="container">
@@ -77,6 +78,28 @@
             <div class="stat-info">
               <h3 id="pendingFines">$0</h3>
               <p>Pending Fines</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="charts-section">
+          <div class="chart-container">
+            <div class="chart-card">
+              <h3><i class="fas fa-chart-pie"></i> Books by Genre</h3>
+              <div id="genreChart"></div>
+            </div>
+          </div>
+          <div class="chart-container">
+            <div class="chart-card">
+              <h3><i class="fas fa-chart-doughnut"></i> Books by Status</h3>
+              <div id="statusChart"></div>
+            </div>
+          </div>
+          <div class="chart-container chart-container-wide">
+            <div class="chart-card">
+              <h3><i class="fas fa-chart-bar"></i> Monthly Loan Activity</h3>
+              <div id="monthlyLoansChart"></div>
             </div>
           </div>
         </div>
@@ -267,6 +290,6 @@
         </div>
       </div>
     </div>
-    <script src="script.js"></script>
+    <script defer src="script.js"></script>
   </body>
 </html>

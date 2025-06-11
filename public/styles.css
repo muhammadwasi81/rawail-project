@@ -168,6 +168,53 @@ body {
   font-weight: 500;
 }
 
+/* Charts Styles */
+.charts-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 25px;
+  margin-top: 40px;
+}
+
+.chart-container {
+  background: white;
+  border-radius: 15px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease;
+}
+
+.chart-container:hover {
+  transform: translateY(-3px);
+}
+
+.chart-container-wide {
+  grid-column: 1 / -1;
+}
+
+.chart-card {
+  padding: 25px;
+}
+
+.chart-card h3 {
+  color: #2c3e50;
+  margin-bottom: 20px;
+  font-size: 1.2rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.chart-card h3 i {
+  color: #3498db;
+}
+
+#genreChart,
+#statusChart,
+#monthlyLoansChart {
+  min-height: 300px;
+}
+
 /* Table Styles */
 .table-container {
   background: white;
@@ -456,6 +503,14 @@ tbody tr:nth-child(even) {
 
   .dashboard-grid {
     grid-template-columns: 1fr;
+  }
+
+  .charts-section {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-container-wide {
+    grid-column: 1;
   }
 
   .table-container {
